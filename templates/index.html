@@ -5,29 +5,43 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CPU Scheduler Simulator</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
     <style>
         .timeline-container {
             overflow-x: auto;
             margin: 20px 0;
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.1);
         }
         .timeline {
             display: flex;
-            height: 50px;
+            height: 60px;
             margin: 20px 0;
         }
         .timeline-block {
             height: 100%;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
             color: white;
             margin-right: 2px;
+            border-radius: 4px;
+            transition: transform 0.2s;
+            cursor: pointer;
+        }
+        .timeline-block:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
         }
         .process-form {
             background-color: #f8f9fa;
             padding: 20px;
             border-radius: 8px;
             margin-bottom: 20px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.05);
         }
         .results-section {
             background-color: #fff;
@@ -35,23 +49,67 @@
             border-radius: 8px;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
         }
+        .process-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            transition: transform 0.2s;
+        }
+        .process-card:hover {
+            transform: translateY(-2px);
+        }
+        .loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255,255,255,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .invalid-feedback {
+            display: none;
+            color: #dc3545;
+            font-size: 0.875em;
+        }
+        .time-marker {
+            position: absolute;
+            bottom: -20px;
+            font-size: 12px;
+            color: #666;
+        }
     </style>
 </head>
 <body class="bg-light">
+    <div class="loading" id="loading">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+
     <div class="container py-5">
         <h1 class="text-center mb-4">CPU Scheduler Simulator</h1>
         
         <div class="process-form">
             <div class="row mb-3">
                 <div class="col-md-4">
-                    <select id="algorithm" class="form-select">
+                    <label for="algorithm" class="form-label">Scheduling Algorithm</label>
+                    <select id="algorithm" class="form-select" data-bs-toggle="tooltip" title="Choose the scheduling algorithm to simulate">
                         <option value="FCFS">First Come First Serve (FCFS)</option>
                         <option value="SJF">Shortest Job First (SJF)</option>
                         <option value="RR">Round Robin (RR)</option>
                     </select>
                 </div>
                 <div class="col-md-4" id="quantum-container" style="display: none;">
-                    <input type="number" id="quantum" class="form-control" value="2" min="1" placeholder="Time Quantum">
+                    <label for="quantum" class="form-label">Time Quantum</label>
+                    <input type="number" id="quantum" class="form-control" value="2" min="1" 
+                           data-bs-toggle="tooltip" title="Time slice for Round Robin algorithm">
+                    <div class="invalid-feedback">Please enter a value greater than 0</div>
                 </div>
             </div>
 
@@ -59,8 +117,17 @@
                 <!-- Process inputs will be added here -->
             </div>
 
-            <button class="btn btn-primary me-2" onclick="addProcess()">Add Process</button>
-            <button class="btn btn-success" onclick="simulate()">Simulate</button>
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="addProcess()" data-bs-toggle="tooltip" title="Add a new process">
+                    <i class="bi bi-plus-circle"></i> Add Process
+                </button>
+                <button class="btn btn-success" onclick="simulate()" data-bs-toggle="tooltip" title="Run simulation">
+                    <i class="bi bi-play-circle"></i> Simulate
+                </button>
+                <button class="btn btn-secondary" onclick="resetSimulation()" data-bs-toggle="tooltip" title="Clear all processes">
+                    <i class="bi bi-arrow-counterclockwise"></i> Reset
+                </button>
+            </div>
         </div>
 
         <div class="results-section" id="results" style="display: none;">
@@ -71,7 +138,7 @@
             <div class="row">
                 <div class="col-md-6">
                     <h4>Process Metrics</h4>
-                    <table class="table">
+                    <table class="table table-hover">
                         <thead>
                             <tr>
                                 <th>Process</th>
@@ -84,19 +151,32 @@
                 </div>
                 <div class="col-md-6">
                     <h4>Average Metrics</h4>
-                    <p>Average Turnaround Time: <span id="avg-turnaround"></span></p>
-                    <p>Average Waiting Time: <span id="avg-waiting"></span></p>
+                    <div class="card">
+                        <div class="card-body">
+                            <p class="mb-2">Average Turnaround Time: <span id="avg-turnaround" class="badge bg-primary"></span></p>
+                            <p class="mb-0">Average Waiting Time: <span id="avg-waiting" class="badge bg-primary"></span></p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         let processCount = 0;
         const colors = [
             '#4285f4', '#ea4335', '#fbbc05', '#34a853',
             '#ff6d01', '#46bdc6', '#7baaf7', '#f07b72'
         ];
+
+        // Initialize tooltips
+        document.addEventListener('DOMContentLoaded', function() {
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            var tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+        });
 
         document.getElementById('algorithm').addEventListener('change', function() {
             const quantumContainer = document.getElementById('quantum-container');
@@ -106,33 +186,103 @@
         function addProcess() {
             const container = document.getElementById('processes-container');
             const processDiv = document.createElement('div');
-            processDiv.className = 'row mb-3';
+            processDiv.className = 'process-card';
             processDiv.innerHTML = `
-                <div class="col-md-3">
-                    <input type="number" class="form-control" placeholder="Arrival Time" 
-                           id="arrival-${processCount}" min="0" value="0">
-                </div>
-                <div class="col-md-3">
-                    <input type="number" class="form-control" placeholder="Burst Time" 
-                           id="burst-${processCount}" min="1" value="1">
-                </div>
-                <div class="col-md-2">
-                    <button class="btn btn-danger" onclick="this.parentElement.parentElement.remove()">
-                        Remove
-                    </button>
+                <div class="row align-items-center">
+                    <div class="col-md-3">
+                        <label class="form-label">Process Name</label>
+                        <input type="text" class="form-control" placeholder="P${processCount}" 
+                               id="name-${processCount}" value="P${processCount}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Arrival Time</label>
+                        <input type="number" class="form-control" placeholder="Arrival Time" 
+                               id="arrival-${processCount}" min="0" value="0"
+                               data-bs-toggle="tooltip" title="Time at which process arrives">
+                        <div class="invalid-feedback">Please enter a valid arrival time</div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Burst Time</label>
+                        <input type="number" class="form-control" placeholder="Burst Time" 
+                               id="burst-${processCount}" min="1" value="1"
+                               data-bs-toggle="tooltip" title="Time required for process execution">
+                        <div class="invalid-feedback">Please enter a burst time greater than 0</div>
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-danger mt-4" onclick="removeProcess(this)"
+                                data-bs-toggle="tooltip" title="Remove this process">
+                            <i class="bi bi-trash"></i> Remove
+                        </button>
+                    </div>
                 </div>
             `;
             container.appendChild(processDiv);
+            
+            // Initialize tooltips for new elements
+            var tooltipTriggerList = [].slice.call(processDiv.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.forEach(function(tooltipTriggerEl) {
+                new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+            
             processCount++;
+        }
+
+        function removeProcess(button) {
+            button.closest('.process-card').remove();
+        }
+
+        function resetSimulation() {
+            document.getElementById('processes-container').innerHTML = '';
+            document.getElementById('results').style.display = 'none';
+            processCount = 0;
+            addProcess();
+        }
+
+        function validateInputs() {
+            let isValid = true;
+            const inputs = document.querySelectorAll('input[type="number"]');
+            
+            inputs.forEach(input => {
+                const value = parseInt(input.value);
+                if (input.id.startsWith('burst-')) {
+                    if (isNaN(value) || value < 1) {
+                        input.classList.add('is-invalid');
+                        isValid = false;
+                    } else {
+                        input.classList.remove('is-invalid');
+                    }
+                } else if (input.id.startsWith('arrival-')) {
+                    if (isNaN(value) || value < 0) {
+                        input.classList.add('is-invalid');
+                        isValid = false;
+                    } else {
+                        input.classList.remove('is-invalid');
+                    }
+                }
+            });
+
+            if (document.getElementById('algorithm').value === 'RR') {
+                const quantum = parseInt(document.getElementById('quantum').value);
+                if (isNaN(quantum) || quantum < 1) {
+                    document.getElementById('quantum').classList.add('is-invalid');
+                    isValid = false;
+                } else {
+                    document.getElementById('quantum').classList.remove('is-invalid');
+                }
+            }
+
+            return isValid;
         }
 
         function getProcesses() {
             const processes = [];
-            document.querySelectorAll('#processes-container .row').forEach((row, index) => {
-                const arrivalTime = parseInt(row.querySelector('input[id^="arrival-"]').value);
-                const burstTime = parseInt(row.querySelector('input[id^="burst-"]').value);
+            document.querySelectorAll('.process-card').forEach((card, index) => {
+                const name = card.querySelector('input[id^="name-"]').value;
+                const arrivalTime = parseInt(card.querySelector('input[id^="arrival-"]').value);
+                const burstTime = parseInt(card.querySelector('input[id^="burst-"]').value);
                 processes.push({
                     id: index,
+                    name: name,
                     arrival_time: arrivalTime,
                     burst_time: burstTime
                 });
@@ -141,6 +291,10 @@
         }
 
         function simulate() {
+            if (!validateInputs()) {
+                return;
+            }
+
             const algorithm = document.getElementById('algorithm').value;
             const quantum = parseInt(document.getElementById('quantum').value);
             const processes = getProcesses();
@@ -149,6 +303,9 @@
                 alert('Please add at least one process');
                 return;
             }
+
+            // Show loading indicator
+            document.getElementById('loading').style.display = 'flex';
 
             fetch('/simulate', {
                 method: 'POST',
@@ -162,7 +319,15 @@
                 }),
             })
             .then(response => response.json())
-            .then(data => displayResults(data));
+            .then(data => {
+                displayResults(data);
+                document.getElementById('loading').style.display = 'none';
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('loading').style.display = 'none';
+                alert('An error occurred during simulation');
+            });
         }
 
         function displayResults(data) {
@@ -172,14 +337,34 @@
             const timeline = document.getElementById('timeline');
             timeline.innerHTML = '';
             
+            let maxTime = 0;
             data.timeline.forEach(block => {
                 const duration = block.end - block.start;
+                maxTime = Math.max(maxTime, block.end);
+                
                 const div = document.createElement('div');
                 div.className = 'timeline-block';
                 div.style.width = `${duration * 50}px`;
                 div.style.backgroundColor = colors[block.process % colors.length];
-                div.textContent = `P${block.process}`;
+                
+                const processName = document.querySelector(`#name-${block.process}`).value;
+                div.innerHTML = `
+                    ${processName}<br>
+                    <small>${block.start}-${block.end}</small>
+                `;
+                
+                // Add tooltip
+                div.setAttribute('data-bs-toggle', 'tooltip');
+                div.setAttribute('data-bs-placement', 'top');
+                div.setAttribute('title', `${processName}: ${block.start} to ${block.end}`);
+                
                 timeline.appendChild(div);
+            });
+
+            // Initialize tooltips for timeline blocks
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('.timeline-block[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.forEach(function(tooltipTriggerEl) {
+                new bootstrap.Tooltip(tooltipTriggerEl);
             });
 
             // Display metrics
@@ -188,19 +373,24 @@
             
             Object.keys(data.turnaround_time).forEach(pid => {
                 const row = document.createElement('tr');
+                const processName = document.querySelector(`#name-${pid}`).value;
                 row.innerHTML = `
-                    <td>P${pid}</td>
+                    <td>${processName}</td>
                     <td>${data.turnaround_time[pid]}</td>
                     <td>${data.waiting_time[pid]}</td>
                 `;
                 metricsTable.appendChild(row);
             });
 
-            // Display averages
-            document.getElementById('avg-turnaround').textContent = 
-                data.avg_turnaround_time.toFixed(2);
-            document.getElementById('avg-waiting').textContent = 
-                data.avg_waiting_time.toFixed(2);
+            // Display averages with animation
+            const avgTurnaround = document.getElementById('avg-turnaround');
+            const avgWaiting = document.getElementById('avg-waiting');
+            
+            avgTurnaround.textContent = data.avg_turnaround_time.toFixed(2);
+            avgWaiting.textContent = data.avg_waiting_time.toFixed(2);
+
+            // Scroll to results
+            document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
         }
 
         // Add initial process
