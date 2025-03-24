@@ -37,4 +37,4 @@ A web-based CPU scheduling algorithm simulator that demonstrates various schedul
 ## Metrics Explained
 - Turnaround Time: Time taken from process arrival to completion
 - Waiting Time: Time spent waiting in the ready queue
-- Timeline: Visual representation of process execution order
+- Timeline: Visual representation of process execution order of process
