@@ -26,7 +26,7 @@ def calculate_metrics(timeline, processes):
         'avg_turnaround_time': avg_turnaround,
         'avg_waiting_time': avg_waiting
     }
-
+#Alorithm of First come first Search
 def FCFS(processes):
     timeline = []
     current_time = 0
