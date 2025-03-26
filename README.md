@@ -4,6 +4,7 @@ A web-based CPU scheduling algorithm simulator that demonstrates various schedul
 - First Come First Serve (FCFS)
 - Shortest Job First (SJF)
 - Round Robin (RR)
+- 
 
 ## Features
 - Interactive web interface
