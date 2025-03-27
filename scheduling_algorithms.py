@@ -44,7 +44,7 @@ def FCFS(processes):
         current_time += p['burst_time']
     
     return calculate_metrics(timeline, processes)
-
+#Alorithm of Shortest JOb First
 def SJF(processes):
     timeline = []
     current_time = 0
@@ -66,7 +66,7 @@ def SJF(processes):
         remaining_processes.remove(next_process)
     
     return calculate_metrics(timeline, processes)
-
+#Alorithm of Round robin
 def RoundRobin(processes, quantum):
     timeline = []
     current_time = 0
@@ -142,7 +142,7 @@ def SRTF(processes):
             current_process = None
     
     return calculate_metrics(timeline, processes)
-
+#Alorithm of Priority 
 def Priority(processes):
     timeline = []
     current_time = 0
